@@ -52,6 +52,10 @@ mi-proyecto-riesgo/
 │   │   │   ├── ternarySearch.ts          # Búsqueda ternaria, O(log₃ n)
 │   │   │   ├── interpolationSearch.ts    # Por interpolación, O(log log n)
 │   │   │   └── index.ts                  # Exporta búsquedas y tipos
+│   │   ├── greedy/
+│   │   │   ├── dijkstra.ts               # Grafo de grados + camino mínimo, O((V+E) log V)
+│   │   │   ├── knapsackGreedy.ts          # Mochila 0/1 voraz, O(n log n)
+│   │   │   └── index.ts                  # Exporta Dijkstra y el voraz
 │   │   └── types.ts                      # Interfaz Credito + tipos de orden/búsqueda
 │   │
 │   ├── components/
@@ -60,8 +64,7 @@ mi-proyecto-riesgo/
 │   │   │   ├── TablaPrestamos.tsx        # Recibe el array ya ordenado
 │   │   │   ├── PanelOrdenamiento.tsx     # Selects de método, variable y sentido
 │   │   │   ├── PanelBusqueda.tsx         # Selects de método, variable y valor
-│   │   │   ├── PanelProximamente.tsx     # Mensaje de módulos futuros
-│   │   │   └── StatsCards.tsx            # Tarjetas de resumen
+│   │   │   ├── StatsCards.tsx            # Tarjetas de resumen
 │   │   └── layout/Sidebar.tsx            # Navegación entre módulos
 │   │
 │   ├── hooks/
@@ -70,7 +73,10 @@ mi-proyecto-riesgo/
 │   │   ├── useAlgorithmAnalyzer.ts       # Estado, análisis y comparación
 │   │   └── useTheme.ts                   # Tema claro/oscuro persistente
 │   │
-│   ├── pages/Dashboard.tsx               # Página principal
+│   ├── pages/
+│   │   ├── Dashboard.tsx                 # Página principal
+│   │   ├── Grafo.tsx                     # Módulo de grafos con Dijkstra
+│   │   └── Optimizacion.tsx              # Comparación mochila DP vs. voraz
 │   ├── main.tsx
 │   └── index.css
 │
@@ -115,7 +121,13 @@ cartera.
 - **Búsqueda**: secuencial, binaria, ternaria y por interpolación. Antes de
   buscar se ordena una copia de los datos por la variable elegida, requisito de
   los tres últimos algoritmos.
-- **Próximamente**: muestra el mensaje de módulos futuros.
+- **Optimización de cartera**: compara la mochila 0/1 resuelta con programación
+  dinámica contra un algoritmo voraz. Ambas variantes comparten presupuesto y
+  formato de resultado; la interfaz guarda tiempo, ganancia y cantidad de
+  préstamos de cada ejecución para compararlas.
+- **Análisis de Grafo**: los grados `loan_grade` son los nodos y las
+  aristas pesan la tasa de interés media conjunta de dos grados. El camino de
+  menor costo se calcula desde el grado A hasta el destino elegido.
 
 El sidebar incluye un botón para alternar entre modo claro y oscuro (se guarda
 en `localStorage`) y un enlace al perfil de GitHub del autor.
@@ -216,3 +228,22 @@ temporalmente cada registro encontrado y repite la búsqueda hasta que el
 algoritmo no encuentre más. Cada coincidencia conserva sus propias métricas y
 se identifica por su número de registro (`#`). Mientras hay una búsqueda activa,
 la tabla de préstamos muestra únicamente los registros encontrados.
+
+## Análisis de grafo (Dijkstra)
+
+El módulo vive en `src/pages/Grafo.tsx` y la lógica en
+`src/algorithms/greedy/dijkstra.ts`:
+
+- **Nodos**: cada valor de `loan_grade` presente en el dataset. El nodo muestra
+  la tasa de interés media de sus préstamos.
+- **Aristas**: el dataset no contiene transiciones entre grados, así que cada
+  grado se conecta con los dos siguientes. Los atajos permiten que existan
+  varias rutas y que Dijkstra tenga algo que optimizar.
+- **Peso**: tasa de interés media de todos los préstamos de los dos grados que
+  conecta la arista. Los registros sin `loan_int_rate` no cuentan en el
+  promedio.
+- **Dijkstra**: cola de prioridad con montículo binario, O((V + E) log V). El
+  costo total es la suma de los pesos de las aristas del camino, no un promedio.
+
+Con el dataset incluido, la ruta de A a F es `A → B → D → F` y el grafo se
+dibuja en SVG resaltando el camino y el costo de cada arista.

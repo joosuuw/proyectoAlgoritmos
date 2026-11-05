@@ -62,6 +62,14 @@ export type SortAlgorithm = (
 export interface SearchMetrics {
   /** Comparaciones entre el valor buscado y los elementos del array. */
   comparisons: number;
+  /**
+   * Iteraciones o pasos realizados por el algoritmo:
+   * - Secuencial: posición del último elemento encontrado (o el total del
+   *   arreglo si no hay coincidencias).
+   * - Binaria y ternaria: veces que se dividió el rango de búsqueda.
+   * - Interpolación: estimaciones realizadas (no se muestra en la interfaz).
+   */
+  iterations: number;
   /** Tiempo de ejecución medido con `performance.now()`. */
   durationMs: number;
 }
@@ -69,8 +77,9 @@ export interface SearchMetrics {
 export interface SearchResult {
   /** Indica si se encontró al menos una coincidencia. */
   found: boolean;
-  /** Posición de la coincidencia dentro del array analizado, o -1. */
-  index: number;
+  /** Índices de todas las coincidencias, de menor a mayor. */
+  indexes: number[];
+  /** Coste real de la búsqueda que localizó todas las coincidencias. */
   metrics: SearchMetrics;
 }
 

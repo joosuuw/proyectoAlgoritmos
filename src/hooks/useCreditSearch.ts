@@ -32,24 +32,16 @@ const SEARCHES: Record<SearchAlgorithmName, SearchAlgorithm> = {
   interpolation: interpolationSearch,
 };
 
-export interface SearchMatch {
-  record: Credito;
-  /** Comparaciones y tiempo medidos en la búsqueda de este registro. */
-  metrics: SearchMetrics;
-}
-
 export interface SearchOutcome {
   algorithm: SearchAlgorithmName;
   key: SortKey;
   target: number;
   /** Todos los registros que coinciden con el valor buscado. */
-  matches: SearchMatch[];
+  matches: Credito[];
   /** Total de registros del dataset antes de filtrar. */
   total: number;
-  /** Suma de las métricas de todas las búsquedas exitosas. */
-  totals: SearchMetrics;
-  /** Métricas del último intento, útil cuando no hay coincidencias. */
-  lastAttempt: SearchMetrics;
+  /** Coste real de la única búsqueda que localizó todas las coincidencias. */
+  metrics: SearchMetrics;
 }
 
 export interface UseCreditSearchResult {
@@ -65,15 +57,12 @@ export interface UseCreditSearchResult {
   reset: () => void;
 }
 
-const EMPTY_METRICS: SearchMetrics = { comparisons: 0, durationMs: 0 };
-
 /**
  * Gestiona el estado de la búsqueda y ejecuta el algoritmo seleccionado.
  *
- * Para obtener todas las coincidencias se busca, se extrae temporalmente el
- * registro encontrado del conjunto y se vuelve a buscar, hasta que el
- * algoritmo no encuentre más resultados. Cada coincidencia conserva sus
- * propias comparaciones y su propio tiempo.
+ * Cada algoritmo hace una sola pasada/búsqueda y devuelve todas las
+ * coincidencias junto con el coste real de esa búsqueda, sin eliminaciones ni
+ * reinicios que inflen las iteraciones.
  */
 export function useCreditSearch(creditos: Credito[]): UseCreditSearchResult {
   const [algorithm, setAlgorithmState] =
@@ -123,37 +112,18 @@ export function useCreditSearch(creditos: Credito[]): UseCreditSearchResult {
       return;
     }
 
-    // Binaria, ternaria e interpolación necesitan datos ordenados.
+    // Binaria, ternaria e interpolación necesitan datos ordenados. La
+    // secuencial también los recibe ordenados por coherencia con la tabla.
     const pool = [...creditos].sort((a, b) => a[key] - b[key]);
-    const total = pool.length;
-    const matches: SearchMatch[] = [];
-    let lastAttempt = EMPTY_METRICS;
 
-    while (pool.length > 0) {
-      const result = SEARCHES[algorithm](pool, key, target);
-      lastAttempt = result.metrics;
+    // Una sola ejecución del algoritmo devuelve todas las coincidencias.
+    const result = SEARCHES[algorithm](pool, key, target);
 
-      if (!result.found || result.index < 0) break;
-
-      const record = pool[result.index];
-
-      // Salvaguarda para no repetir indefinidamente un resultado inválido.
-      if (!record || record[key] !== target) break;
-
-      pool.splice(result.index, 1);
-      matches.push({ record, metrics: result.metrics });
-    }
-
-    // Se presentan ordenadas por número de registro (#).
-    matches.sort((a, b) => a.record.id - b.record.id);
-
-    const totals = matches.reduce<SearchMetrics>(
-      (acc, match) => ({
-        comparisons: acc.comparisons + match.metrics.comparisons,
-        durationMs: acc.durationMs + match.metrics.durationMs,
-      }),
-      { ...EMPTY_METRICS },
-    );
+    const matches = result.indexes
+      .map((index) => pool[index])
+      .filter((record): record is Credito => record !== undefined)
+      // Se presentan ordenadas por número de registro (#).
+      .sort((a, b) => a.id - b.id);
 
     setError(null);
     setOutcome({
@@ -161,9 +131,8 @@ export function useCreditSearch(creditos: Credito[]): UseCreditSearchResult {
       key,
       target,
       matches,
-      total,
-      totals,
-      lastAttempt,
+      total: pool.length,
+      metrics: result.metrics,
     });
   }, [algorithm, creditos, key, query]);
 

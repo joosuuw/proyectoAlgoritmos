@@ -1,4 +1,5 @@
 import type { Credito, SearchResult, SortKey } from "../types";
+import { collectMatches } from "./collectMatches";
 
 /**
  * Búsqueda por interpolación.
@@ -6,6 +7,10 @@ import type { Credito, SearchResult, SortKey } from "../types";
  * Estima la posición probable del valor usando una interpolación lineal entre
  * los extremos del rango. Funciona muy bien con datos numéricos distribuidos de
  * forma uniforme y requiere que el array esté ordenado de forma ascendente.
+ *
+ * Al encontrar una coincidencia se recorre hacia los lados para reunir todas
+ * las coincidencias contiguas. Las comparaciones reportadas son las de la
+ * búsqueda por interpolación, que es la métrica que se muestra en la interfaz.
  *
  * Complejidad: O(log log n) promedio, O(n) en el peor caso.
  */
@@ -16,6 +21,7 @@ export function interpolationSearch(
 ): SearchResult {
   const start = performance.now();
   let comparisons = 0;
+  let steps = 0;
   let index = -1;
   let lo = 0;
   let hi = items.length - 1;
@@ -25,6 +31,7 @@ export function interpolationSearch(
     target >= items[lo][key] &&
     target <= items[hi][key]
   ) {
+    steps++;
     const lowValue = items[lo][key];
     const highValue = items[hi][key];
 
@@ -57,11 +64,15 @@ export function interpolationSearch(
     }
   }
 
+  const indexes =
+    index === -1 ? [] : collectMatches(items, key, target, index);
+
   return {
-    found: index !== -1,
-    index,
+    found: indexes.length > 0,
+    indexes,
     metrics: {
       comparisons,
+      iterations: steps,
       durationMs: performance.now() - start,
     },
   };

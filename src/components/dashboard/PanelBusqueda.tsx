@@ -1,4 +1,4 @@
-import type { Credito, SortKey } from "../../algorithms/types";
+import type { Credito, SearchMetrics, SortKey } from "../../algorithms/types";
 import { SORT_KEY_LABELS } from "../../hooks/useCreditData";
 import {
   SEARCH_ALGORITHM_LABELS,
@@ -48,6 +48,41 @@ function describeRecord(record: Credito): string {
   return `${record.personAge} años · ${money.format(
     record.personIncome,
   )} de ingreso · ${money.format(record.loanAmt)} de préstamo`;
+}
+
+type SearchMetricKind = "iterations" | "steps" | "comparisons";
+
+/**
+ * La secuencial reporta elementos recorridos, la binaria y la ternaria reportan
+ * divisiones del rango, y la interpolación conserva las comparaciones.
+ */
+function metricKind(algorithm: SearchAlgorithmName): SearchMetricKind {
+  if (algorithm === "interpolation") return "comparisons";
+  if (algorithm === "sequential") return "iterations";
+  return "steps";
+}
+
+function metricValue(
+  metrics: SearchMetrics,
+  algorithm: SearchAlgorithmName,
+): number {
+  return metricKind(algorithm) === "comparisons"
+    ? metrics.comparisons
+    : metrics.iterations;
+}
+
+function metricHeading(algorithm: SearchAlgorithmName): string {
+  const kind = metricKind(algorithm);
+
+  if (kind === "comparisons") {
+    return "Comparaciones";
+  }
+
+  if (kind === "iterations") {
+    return "Iteraciones";
+  }
+
+  return "Pasos";
 }
 
 interface PanelBusquedaProps {
@@ -142,8 +177,8 @@ export default function PanelBusqueda({ search }: PanelBusquedaProps) {
 
       <p className="search-note">
         Los datos se ordenan de forma ascendente por la variable elegida antes de
-        buscar. Al encontrar un registro se retira temporalmente del conjunto y se
-        repite la búsqueda para mostrar todas las coincidencias.
+        buscar. Cada algoritmo se ejecuta una sola vez y localiza todas las
+        coincidencias en esa misma búsqueda.
       </p>
 
       {error && (
@@ -167,21 +202,12 @@ export default function PanelBusqueda({ search }: PanelBusquedaProps) {
           </div>
 
           <ol className="search-matches">
-            {outcome.matches.map((match) => (
-              <li key={match.record.id} className="search-match">
+            {outcome.matches.map((record) => (
+              <li key={record.id} className="search-match">
                 <div className="search-match__info">
-                  <span className="search-match__id">#{match.record.id}</span>
+                  <span className="search-match__id">#{record.id}</span>
                   <span className="search-match__desc">
-                    {describeRecord(match.record)}
-                  </span>
-                </div>
-                <div className="search-match__metrics">
-                  <span>
-                    <strong>{integer.format(match.metrics.comparisons)}</strong>{" "}
-                    comparaciones
-                  </span>
-                  <span>
-                    <strong>{match.metrics.durationMs.toFixed(2)}</strong> ms
+                    {describeRecord(record)}
                   </span>
                 </div>
               </li>
@@ -194,12 +220,16 @@ export default function PanelBusqueda({ search }: PanelBusquedaProps) {
               <dd>{integer.format(outcome.matches.length)}</dd>
             </div>
             <div>
-              <dt>Comparaciones totales</dt>
-              <dd>{integer.format(outcome.totals.comparisons)}</dd>
+              <dt>{metricHeading(outcome.algorithm)}</dt>
+              <dd>
+                {integer.format(
+                  metricValue(outcome.metrics, outcome.algorithm),
+                )}
+              </dd>
             </div>
             <div>
-              <dt>Tiempo total</dt>
-              <dd>{outcome.totals.durationMs.toFixed(2)} ms</dd>
+              <dt>Tiempo</dt>
+              <dd>{outcome.metrics.durationMs.toFixed(2)} ms</dd>
             </div>
           </dl>
         </div>
@@ -218,12 +248,16 @@ export default function PanelBusqueda({ search }: PanelBusquedaProps) {
 
           <dl className="metrics">
             <div>
-              <dt>Comparaciones</dt>
-              <dd>{integer.format(outcome.lastAttempt.comparisons)}</dd>
+              <dt>{metricHeading(outcome.algorithm)}</dt>
+              <dd>
+                {integer.format(
+                  metricValue(outcome.metrics, outcome.algorithm),
+                )}
+              </dd>
             </div>
             <div>
               <dt>Tiempo</dt>
-              <dd>{outcome.lastAttempt.durationMs.toFixed(2)} ms</dd>
+              <dd>{outcome.metrics.durationMs.toFixed(2)} ms</dd>
             </div>
             <div>
               <dt>Método</dt>

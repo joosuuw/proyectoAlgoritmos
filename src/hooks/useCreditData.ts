@@ -153,15 +153,16 @@ export function parseCreditos(csv: string): Credito[] {
  * algoritmo seleccionado cada vez que cambia el algoritmo, el campo o el orden.
  */
 export function useCreditData(
-  csvUrl = "/data/credit_risk_dataset.csv",
+  csvUrl = `${import.meta.env.BASE_URL}data/credit_risk_dataset.csv`,
 ): UseCreditDataResult {
   const [creditos, setCreditos] = useState<Credito[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const [algorithm, setAlgorithm] = useState<AlgorithmName>("quick");
-  const [sortKey, setSortKey] = useState<SortKey>("loanAmt");
-  const [order, setOrder] = useState<SortOrder>("desc");
+  // Al cargar la página el dataset se muestra siempre en su orden original.
+  const [sortKey, setSortKey] = useState<SortKey>("id");
+  const [order, setOrder] = useState<SortOrder>("asc");
 
   useEffect(() => {
     const controller = new AbortController();

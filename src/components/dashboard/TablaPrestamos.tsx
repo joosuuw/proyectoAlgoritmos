@@ -1,4 +1,10 @@
+import { useEffect, useState } from "react";
 import type { Credito, SortKey, SortOrder } from "../../algorithms/types";
+
+const REGISTROS_POR_PAGINA = 50;
+
+// Mismo estilo que el botón "Borrar filtros".
+const BOTON_PAGINACION = "btn btn--outline";
 
 const money = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -45,6 +51,24 @@ export default function TablaPrestamos({
   subtitle,
   emptyMessage,
 }: TablaPrestamosProps) {
+  const [paginaActual, setPaginaActual] = useState(1);
+
+  const totalPaginas = Math.max(
+    1,
+    Math.ceil(creditos.length / REGISTROS_POR_PAGINA),
+  );
+  const paginaSegura = Math.min(paginaActual, totalPaginas);
+  const indiceInicial = (paginaSegura - 1) * REGISTROS_POR_PAGINA;
+  const creditosVisibles = creditos.slice(
+    indiceInicial,
+    indiceInicial + REGISTROS_POR_PAGINA,
+  );
+
+  // Al cambiar de filtro, algoritmo, variable o sentido, volvemos al inicio.
+  useEffect(() => {
+    setPaginaActual(1);
+  }, [creditos, sortKey, order]);
+
   function renderHeader(key: SortKey, label: string, field: string) {
     const active = sortKey === key;
 
@@ -123,7 +147,7 @@ export default function TablaPrestamos({
               </tr>
             </thead>
             <tbody>
-              {creditos.map((credito) => (
+              {creditosVisibles.map((credito) => (
                 <tr key={credito.id}>
                   <td className="muted">{credito.id}</td>
                   <td>{credito.personAge}</td>
@@ -169,6 +193,56 @@ export default function TablaPrestamos({
             </tbody>
           </table>
         </div>
+      )}
+
+      {creditos.length > 0 && (
+        <nav
+          className="pagination flex flex-wrap items-center justify-between gap-3 border-t border-[var(--border)] bg-[var(--surface-alt)] px-5 py-4"
+          aria-label="Paginación de préstamos"
+        >
+          <button
+            type="button"
+            className={BOTON_PAGINACION}
+            onClick={() =>
+              setPaginaActual((pagina) => Math.max(1, pagina - 1))
+            }
+            disabled={paginaSegura === 1}
+          >
+            Anterior
+          </button>
+
+          <span
+            className="text-sm font-medium text-[var(--muted)]"
+            aria-live="polite"
+          >
+            Página{" "}
+            <strong className="font-bold text-[var(--heading)]">
+              {paginaSegura}
+            </strong>{" "}
+            de{" "}
+            <strong className="font-bold text-[var(--heading)]">
+              {totalPaginas}
+            </strong>
+            <span className="hidden sm:inline">
+              {" "}
+              · Mostrando {indiceInicial + 1}–
+              {indiceInicial + creditosVisibles.length} de {creditos.length}
+            </span>
+          </span>
+
+          <button
+            type="button"
+            className={BOTON_PAGINACION}
+            onClick={() =>
+              setPaginaActual((pagina) =>
+                Math.min(totalPaginas, pagina + 1),
+              )
+            }
+            disabled={paginaSegura === totalPaginas}
+          >
+            Siguiente
+          </button>
+        </nav>
       )}
     </section>
   );

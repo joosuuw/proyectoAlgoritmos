@@ -2,10 +2,12 @@ import type { ReactNode } from "react";
 import type { Theme } from "../../hooks/useTheme";
 
 export type ModuleId =
+  | "inicio"
   | "analizador"
   | "ordenamiento"
   | "busqueda"
-  | "proximamente";
+  | "optimizacion"
+  | "grafos";
 
 interface SidebarProps {
   active: ModuleId;
@@ -21,6 +23,15 @@ interface ModuleItem {
 }
 
 const MODULES: ModuleItem[] = [
+  {
+    id: "inicio",
+    label: "Inicio",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+        <path d="m3.5 10.5 8.5-7 8.5 7V20a1 1 0 0 1-1 1h-5v-6h-5v6h-5a1 1 0 0 1-1-1Z" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
   {
     id: "ordenamiento",
     label: "Ordenamiento",
@@ -42,12 +53,25 @@ const MODULES: ModuleItem[] = [
     ),
   },
   {
-    id: "proximamente",
-    label: "Próximamente",
+    id: "optimizacion",
+    label: "Optimización",
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-        <circle cx="12" cy="12" r="8" />
-        <path d="M12 8v4.5l3 1.8" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M4 19V5m0 14h16" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="m7 15 3.5-4 3 2.5L19 7" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M19 7h-3.5M19 7v3.5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
+  {
+    id: "grafos",
+    label: "Análisis de Grafo",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+        <circle cx="5.5" cy="12" r="2.5" />
+        <circle cx="18.5" cy="5.5" r="2.5" />
+        <circle cx="18.5" cy="18.5" r="2.5" />
+        <path d="m7.7 10.8 8.6-4.1M7.7 13.2l8.6 4.1M18.5 8v8" strokeLinecap="round" />
       </svg>
     ),
   },
