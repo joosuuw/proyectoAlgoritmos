@@ -18,6 +18,8 @@ interface PanelOrdenamientoProps {
   order: SortOrder;
   onOrderChange: (order: SortOrder) => void;
   metrics: SortMetrics;
+  /** `true` mientras el Web Worker está ordenando el dataset. */
+  isSorting: boolean;
   /** Vuelve al orden original por número de registro. */
   onClearSort: () => void;
   /** Indica si ya se está mostrando el orden original. */
@@ -32,6 +34,7 @@ export default function PanelOrdenamiento({
   order,
   onOrderChange,
   metrics,
+  isSorting,
   onClearSort,
   canClear,
 }: PanelOrdenamientoProps) {
@@ -105,18 +108,18 @@ export default function PanelOrdenamiento({
         </label>
       </div>
 
-      <dl className="metrics">
+      <dl className="metrics" aria-busy={isSorting}>
         <div>
           <dt>Comparaciones</dt>
-          <dd>{integer.format(metrics.comparisons)}</dd>
+          <dd>{isSorting ? "---" : integer.format(metrics.comparisons)}</dd>
         </div>
         <div>
           <dt>Intercambios</dt>
-          <dd>{integer.format(metrics.swaps)}</dd>
+          <dd>{isSorting ? "---" : integer.format(metrics.swaps)}</dd>
         </div>
         <div>
           <dt>Tiempo</dt>
-          <dd>{metrics.durationMs.toFixed(2)} ms</dd>
+          <dd>{isSorting ? "---" : `${metrics.durationMs.toFixed(2)} ms`}</dd>
         </div>
       </dl>
     </section>

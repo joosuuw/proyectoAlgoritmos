@@ -22,6 +22,8 @@ const percent = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 0,
 });
 
+const integer = new Intl.NumberFormat("en-US");
+
 function formatRate(value: number): string {
   return value > 0 ? `${decimal.format(value)}%` : "—";
 }
@@ -42,6 +44,10 @@ interface TablaPrestamosProps {
   subtitle?: string;
   /** Mensaje cuando no hay registros que mostrar. */
   emptyMessage?: string;
+  /** `true` mientras el Web Worker está ordenando; difumina la tabla anterior. */
+  isSorting?: boolean;
+  /** Total de registros del dataset, para el mensaje de carga. */
+  totalRecords?: number;
 }
 
 export default function TablaPrestamos({
@@ -50,6 +56,8 @@ export default function TablaPrestamos({
   order,
   subtitle,
   emptyMessage,
+  isSorting = false,
+  totalRecords,
 }: TablaPrestamosProps) {
   const [paginaActual, setPaginaActual] = useState(1);
 
@@ -91,7 +99,7 @@ export default function TablaPrestamos({
   }
 
   return (
-    <section className="card tabla-card">
+    <section className="card tabla-card" aria-busy={isSorting}>
       <header className="card__header">
         <div>
           <h2>Préstamos</h2>
@@ -102,12 +110,33 @@ export default function TablaPrestamos({
         </div>
       </header>
 
-      {creditos.length === 0 ? (
+      {isSorting && (
+        <div
+          className={
+            creditos.length > 0 ? "sorting-status" : "sorting-loading"
+          }
+          role="status"
+          aria-live="polite"
+        >
+          <span className="spinner" aria-hidden="true" />
+          <p>
+            Ordenando {integer.format(totalRecords ?? creditos.length)}{" "}
+            registros…
+          </p>
+        </div>
+      )}
+
+      {creditos.length === 0 && !isSorting && (
         <p className="empty-state">
           {emptyMessage ?? "No hay préstamos para mostrar."}
         </p>
-      ) : (
-        <div className="table-wrapper">
+      )}
+
+      {creditos.length > 0 && (
+        <div
+          className={`table-wrapper${isSorting ? " is-sorting" : ""}`}
+          aria-hidden={isSorting || undefined}
+        >
           <table className="tabla">
             <thead>
               <tr>
@@ -206,7 +235,7 @@ export default function TablaPrestamos({
             onClick={() =>
               setPaginaActual((pagina) => Math.max(1, pagina - 1))
             }
-            disabled={paginaSegura === 1}
+            disabled={isSorting || paginaSegura === 1}
           >
             Anterior
           </button>
@@ -238,7 +267,7 @@ export default function TablaPrestamos({
                 Math.min(totalPaginas, pagina + 1),
               )
             }
-            disabled={paginaSegura === totalPaginas}
+            disabled={isSorting || paginaSegura === totalPaginas}
           >
             Siguiente
           </button>

@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { bubbleSort, mergeSort, quickSort } from "../algorithms/sorting";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type {
+  SortWorkerRequest,
+  SortWorkerResponse,
+} from "../algorithms/sortingWorker";
 import type {
   Credito,
-  SortAlgorithm,
   SortKey,
   SortMetrics,
   SortOrder,
@@ -28,12 +30,6 @@ export const SORT_KEY_LABELS: Record<SortKey, string> = {
   cbPersonCredHistLength: "Historial crediticio",
 };
 
-const ALGORITHMS: Record<AlgorithmName, SortAlgorithm> = {
-  bubble: bubbleSort,
-  merge: mergeSort,
-  quick: quickSort,
-};
-
 export interface CreditStats {
   total: number;
   totalMonto: number;
@@ -48,6 +44,8 @@ export interface UseCreditDataResult {
   metrics: SortMetrics;
   stats: CreditStats;
   loading: boolean;
+  /** `true` mientras el Web Worker está ordenando el dataset. */
+  isSorting: boolean;
   error: string | null;
   algorithm: AlgorithmName;
   setAlgorithm: (algorithm: AlgorithmName) => void;
@@ -149,8 +147,8 @@ export function parseCreditos(csv: string): Credito[] {
 }
 
 /**
- * Carga el dataset, mantiene el estado de ordenamiento y ejecuta el
- * algoritmo seleccionado cada vez que cambia el algoritmo, el campo o el orden.
+ * Carga el dataset, mantiene el estado de ordenamiento y delega el trabajo
+ * pesado a un Web Worker cada vez que cambia el algoritmo, el campo o el orden.
  */
 export function useCreditData(
   csvUrl = `${import.meta.env.BASE_URL}data/credit_risk_dataset.csv`,
@@ -163,6 +161,14 @@ export function useCreditData(
   // Al cargar la página el dataset se muestra siempre en su orden original.
   const [sortKey, setSortKey] = useState<SortKey>("id");
   const [order, setOrder] = useState<SortOrder>("asc");
+
+  const [sortedData, setSortedData] = useState<Credito[]>([]);
+  const [metrics, setMetrics] = useState<SortMetrics>(EMPTY_METRICS);
+  const [isSorting, setIsSorting] = useState(false);
+
+  // Worker activo y contador de peticiones para descartar respuestas viejas.
+  const workerRef = useRef<Worker | null>(null);
+  const requestIdRef = useRef(0);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -179,7 +185,12 @@ export function useCreditData(
         }
 
         const text = await response.text();
-        if (!cancelled) setCreditos(parseCreditos(text));
+        if (!cancelled) {
+          const parsed = parseCreditos(text);
+          setCreditos(parsed);
+          // Evita mostrar la tabla vacía mientras arranca la primera ordenación.
+          if (parsed.length > 0) setIsSorting(true);
+        }
       } catch (err) {
         if (!cancelled && (err as Error).name !== "AbortError") {
           setError((err as Error).message || "Error desconocido al cargar los datos.");
@@ -197,13 +208,85 @@ export function useCreditData(
     };
   }, [csvUrl]);
 
-  const sorted = useMemo(() => {
-    if (creditos.length === 0) {
-      return { data: [] as Credito[], metrics: EMPTY_METRICS };
-    }
+  /**
+   * Envía los datos al Web Worker para ordenarlos fuera del hilo principal.
+   *
+   * Si ya había una ordenación en curso, se termina ese Worker antes de crear
+   * uno nuevo: así una petición reciente (por ejemplo, cambiar a Quick Sort)
+   * no tiene que esperar a que termine un Bubble Sort lento.
+   */
+  const ejecutarOrdenamiento = useCallback(
+    (
+      data: Credito[],
+      nextAlgorithm: AlgorithmName,
+      nextSortKey: SortKey,
+      nextOrder: SortOrder,
+    ) => {
+      workerRef.current?.terminate();
+      workerRef.current = null;
 
-    return ALGORITHMS[algorithm](creditos, sortKey, order);
-  }, [creditos, algorithm, sortKey, order]);
+      if (data.length === 0) {
+        setSortedData([]);
+        setMetrics(EMPTY_METRICS);
+        setIsSorting(false);
+        return;
+      }
+
+      const requestId = ++requestIdRef.current;
+
+      // Estado de carga: ocultamos las métricas anteriores.
+      setIsSorting(true);
+      setMetrics(EMPTY_METRICS);
+
+      const worker = new Worker(
+        new URL("../algorithms/sortingWorker.ts", import.meta.url),
+        { type: "module" },
+      );
+      workerRef.current = worker;
+
+      worker.onmessage = (event: MessageEvent<SortWorkerResponse>) => {
+        const response = event.data;
+
+        // Ignoramos respuestas de peticiones que ya fueron reemplazadas.
+        if (response.id !== requestId || workerRef.current !== worker) return;
+
+        setSortedData(response.data);
+        setMetrics(response.metrics);
+        setIsSorting(false);
+      };
+
+      worker.onerror = (event: ErrorEvent) => {
+        if (workerRef.current !== worker) return;
+
+        console.error("Error al ordenar en el Web Worker:", event.message);
+        setIsSorting(false);
+      };
+
+      const message: SortWorkerRequest = {
+        id: requestId,
+        creditos: data,
+        algorithm: nextAlgorithm,
+        sortKey: nextSortKey,
+        order: nextOrder,
+      };
+
+      worker.postMessage(message);
+    },
+    [],
+  );
+
+  // Reordena cuando cambian los datos o cualquiera de los controles.
+  useEffect(() => {
+    ejecutarOrdenamiento(creditos, algorithm, sortKey, order);
+  }, [creditos, algorithm, sortKey, order, ejecutarOrdenamiento]);
+
+  // Libera el Worker al desmontar el componente.
+  useEffect(() => {
+    return () => {
+      workerRef.current?.terminate();
+      workerRef.current = null;
+    };
+  }, []);
 
   const stats = useMemo<CreditStats>(() => {
     const total = creditos.length;
@@ -237,10 +320,11 @@ export function useCreditData(
 
   return {
     creditos,
-    sortedData: sorted.data,
-    metrics: sorted.metrics,
+    sortedData,
+    metrics,
     stats,
     loading,
+    isSorting,
     error,
     algorithm,
     setAlgorithm,

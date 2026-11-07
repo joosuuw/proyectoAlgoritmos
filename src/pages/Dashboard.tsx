@@ -61,6 +61,7 @@ export default function Dashboard() {
     metrics,
     stats,
     loading,
+    isSorting,
     error,
     algorithm,
     setAlgorithm,
@@ -91,6 +92,9 @@ export default function Dashboard() {
 
   const tableSortKey = isFiltered ? "id" : sortKey;
   const tableOrder = isFiltered ? "asc" : order;
+  // La búsqueda muestra sus propios resultados; no se difuminan por un
+  // ordenamiento en segundo plano.
+  const tableIsSorting = isSorting && !isFiltered;
 
   return (
     <div className="app">
@@ -134,6 +138,7 @@ export default function Dashboard() {
                 order={order}
                 onOrderChange={setOrder}
                 metrics={metrics}
+                isSorting={isSorting}
                 onClearSort={clearSort}
                 canClear={canClear}
               />
@@ -150,6 +155,8 @@ export default function Dashboard() {
                 creditos={tableData}
                 sortKey={tableSortKey}
                 order={tableOrder}
+                isSorting={tableIsSorting}
+                totalRecords={creditos.length}
                 subtitle={
                   isFiltered
                     ? `${tableData.length} ${
